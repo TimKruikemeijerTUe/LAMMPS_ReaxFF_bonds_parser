@@ -15,7 +15,7 @@ pip install git+https://github.com/TimKruikemeijerTUe/LAMMPS_ReaxFF_bonds_parser
 ```
 or with `tqdm` 
 ```
-pip install "lammps_reaxff_bonds_parser[tqdm] @  git+https://github.com/TimKruikemeijerTUe/LAMMPS_ReaxFF_bonds_parser.git
+pip install "lammps_reaxff_bonds_parser[tqdm] @  git+https://github.com/TimKruikemeijerTUe/LAMMPS_ReaxFF_bonds_parser.git"
 ```
 
 ## Dependencies
