@@ -16,11 +16,11 @@ pip install git+https://github.com/TimKruikemeijerTUe/LAMMPS_ReaxFF_bonds_parser
 or with `tqdm` 
 ```
 pip install "lammps_reaxff_bonds_parser[tqdm] @  git+https://github.com/TimKruikemeijerTUe/LAMMPS_ReaxFF_bonds_parser.git
-"```
+```
 
 ## Dependencies
 This script relies on [numpy](https://numpy.org/) and [polars](https://pola.rs/). [tqdm](https://tqdm.github.io/) is optionally used for large file progress tracking.
 
 
 ## TODO
-- Support for varying number of particles
+- [x] Support for varying number of particles

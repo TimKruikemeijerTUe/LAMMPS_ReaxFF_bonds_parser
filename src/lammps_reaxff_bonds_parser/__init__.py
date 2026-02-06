@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import sys
 from importlib.util import find_spec
-from itertools import islice
+from itertools import islice, repeat
 from pathlib import Path
 
 import numpy as np
@@ -149,7 +149,7 @@ def _file_to_data(path: Path | str) -> list[str]:
     return data
 
 
-def _parse_comments(comments: list[str]) -> tuple[list[int], int, int, int]:
+def _parse_comments(comments: list[str]) -> tuple[list[int], int | list[int], int, int]:
     timesteps: list[int] = []
     nr_parts: list[int] = []
     max_bs: list[int] = []
@@ -176,10 +176,9 @@ def _parse_comments(comments: list[str]) -> tuple[list[int], int, int, int]:
 
     # Parse number of particles
     if len(np.unique(nr_parts)) == 1:
-        nr_part: int = nr_parts[0]
+        nr_parts: int = nr_parts[0]
     else:
-        print("ERROR: Varying number of particles")
-        sys.exit()
+        print("WARNING: Varying number of particles")
 
     # Parse max number of bonds
     if len(np.unique(max_bs)) == 1:
@@ -189,15 +188,14 @@ def _parse_comments(comments: list[str]) -> tuple[list[int], int, int, int]:
 
     nr_steps: int = len(timesteps)
 
-    return timesteps, nr_part, max_b, nr_steps
+    return timesteps, nr_parts, max_b, nr_steps
 
 
 def _create_table(
     data: list[str],
     timesteps: list[int],
-    nr_part: int,
+    nr_parts: list[int],
     max_b: int,
-    nr_steps: int,
 ) -> DataFrame:
     """Create a table with the ReaxFF bond info; contains lots of hardcoded stuff.
 
@@ -207,12 +205,10 @@ def _create_table(
         The lines containing the data
     timesteps : list[int]
         The timesteps; for each of which the info is given
-    nr_part : int
+    nr_parts : list[int]
         Number of particles
     max_b : int
         Max number of bonds
-    nr_steps : int
-        Number of timesteps
 
     Returns
     -------
@@ -241,8 +237,10 @@ def _create_table(
     )
     table: DataFrame = pl.DataFrame(schema=dict(zip(heads, dtypes, strict=True)))
 
-    for j in range(nr_steps):
-        data_step: list[str] = data[j * nr_part : (j + 1) * nr_part]
+    j_start = 0
+    for nr_part, timestep in zip(nr_parts, timesteps, strict=True):
+        data_step: list[str] = data[j_start : j_start + nr_part]
+        j_start += nr_part
 
         step_table: DataFrame = _step_data_to_table(
             data_step,
@@ -250,7 +248,7 @@ def _create_table(
             max_b,
             id_heads,
             bo_heads,
-            timesteps[j],
+            timestep,
         )
 
         table = table.vstack(step_table)
@@ -267,7 +265,7 @@ def _create_table(
 def _create_table_seq(
     file_path: Path | str,
     timesteps: list[int],
-    nr_part: int,
+    nr_parts: list[int] | int,
     max_b: int,
     nr_steps: int,
     sort: list[str],
@@ -281,7 +279,7 @@ def _create_table_seq(
         Path to the ReaxFF bonds file
     timesteps : list[int]
         The timesteps of the file
-    nr_part : int
+    nr_parts : list[int] | int
         Particles per timestep
     max_b : int
         Max number of bonds
@@ -309,6 +307,11 @@ def _create_table_seq(
     if tqdm_installed:
         pbar = tqdm(total=nr_steps, desc="ReaxFF written: ")
 
+    if isinstance(nr_parts, list):
+        parter = iter(nr_parts)
+    elif isinstance(nr_parts, int):
+        parter = repeat(nr_parts)
+
     stepper = iter(timesteps)
     with (
         open(file_path) as text_file,
@@ -316,6 +319,8 @@ def _create_table_seq(
     ):
         for line in text_file:
             if not line.startswith("#"):
+                nr_part = next(parter)
+
                 data = [line, *list(islice(text_file, 0, nr_part - 1))]
 
                 table = _step_data_to_table(
@@ -390,7 +395,7 @@ def file_to_ReaxFF_bond_table(
         sort = [sort]
 
     comments = _file_to_com(file_path)
-    timesteps, nr_part, max_b, nr_steps = _parse_comments(comments)
+    timesteps, nr_parts, max_b, nr_steps = _parse_comments(comments)
 
     if large_file:
         if not save:
@@ -402,7 +407,7 @@ def file_to_ReaxFF_bond_table(
         table: LazyFrame = _create_table_seq(
             file_path,
             timesteps,
-            nr_part,
+            nr_parts,
             max_b,
             nr_steps,
             sort,
@@ -412,7 +417,9 @@ def file_to_ReaxFF_bond_table(
     else:
         data: list[str] = _file_to_data(file_path)
 
-        table_d: DataFrame = _create_table(data, timesteps, nr_part, max_b, nr_steps)
+        if isinstance(nr_parts, int):  # For small files this inefficiency is fine
+            nr_parts = nr_steps * [nr_parts]
+        table_d: DataFrame = _create_table(data, timesteps, nr_parts, max_b)
         table_d = table_d.sort(sort)
 
         if save:
