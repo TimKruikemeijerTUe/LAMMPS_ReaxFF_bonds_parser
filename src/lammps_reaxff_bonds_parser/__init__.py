@@ -434,6 +434,7 @@ def file_to_ReaxFF_bond_table(
                 table = pl.scan_csv(save_path.with_suffix(".csv"))
                 table.sink_parquet(save_path, **write_kwargs)
                 table = pl.scan_parquet(save_path)
+                save_path.with_suffix(".csv").unlink()
             case _:
                 raise ValueError(save_path.suffix)
 

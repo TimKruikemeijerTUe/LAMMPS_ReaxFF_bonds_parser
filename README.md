@@ -1,5 +1,5 @@
 # lammps_reaxff_bonds_parser
-Turns a LAMMPS ReaxFF bond file into a `polars` table and optionally save it as CSV file. Can be used with large files.
+Turns a LAMMPS ReaxFF bond file into a `polars` table and optionally save it as CSV or parquet file. Can be used with large files.
 
 ## Usage
 ```python
@@ -24,4 +24,4 @@ This script relies on [numpy](https://numpy.org/) and [polars](https://pola.rs/)
 
 ## TODO
 - [x] Support for varying number of particles
-- [ ] Save as .parquet (or other format) instead of .csv for performance; for in memory doable, for sequential maybe csv first then lazy stream to parquet?
+- [x] Add parquet support
