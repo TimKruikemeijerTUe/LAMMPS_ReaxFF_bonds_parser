@@ -3,6 +3,7 @@ import sys
 from importlib.util import find_spec
 from itertools import islice, repeat
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import polars as pl
@@ -269,7 +270,7 @@ def _create_table_seq(
     max_b: int,
     nr_steps: int,
     sort: list[str],
-    save_path: Path | str,
+    save_path: Path,
 ) -> LazyFrame:
     """Create a table with the ReaxFF bond info. Contains lots of hardcoded stuff. Step by step for memory reasons.
 
@@ -287,7 +288,7 @@ def _create_table_seq(
         Number of timesteps
     sort : list[str]
         Headers by which to sort
-    save_path : Path | str
+    save_path : Path
         The path (including name and extension) to save the table to
 
     Returns
@@ -301,7 +302,8 @@ def _create_table_seq(
     sentinel = -2147483648  # Largest signed 32 bit int
 
     first_table = True  # For header writing
-    Path(save_path).open(mode="w", encoding="utf8").close()  # Empty file
+    save_path_csv: Path = save_path.with_suffix(".csv")  # For temporary saving to csv
+    save_path_csv.open(mode="w", encoding="utf8").close()  # Empty file
 
     # Sequential for memory
     if tqdm_installed:
@@ -315,7 +317,7 @@ def _create_table_seq(
     stepper = iter(timesteps)
     with (
         open(file_path) as text_file,
-        open(save_path, mode="a", encoding="utf8") as f,
+        open(save_path_csv, mode="a", encoding="utf8") as f,
     ):
         for line in text_file:
             if not line.startswith("#"):
@@ -351,7 +353,7 @@ def _create_table_seq(
 
     ids_schema = {f"id_{id + 1}": pl.Int32 for id in range(max_b)}
 
-    return pl.scan_csv(save_path, schema_overrides=ids_schema)
+    return pl.scan_csv(save_path_csv, schema_overrides=ids_schema)
 
 
 def file_to_ReaxFF_bond_table(
@@ -360,7 +362,8 @@ def file_to_ReaxFF_bond_table(
     *,
     large_file: bool = False,
     save: bool = False,
-    save_path: Path | str = "",
+    save_path: Path = Path("rff.csv"),
+    write_kwargs: dict[str, Any] | None = None,
     delete_file: bool = False,
 ) -> LazyFrame:
     """Turn a LAMMPS ReaxFF bond file into a `polars` table and optionally save it as CSV file.
@@ -379,8 +382,10 @@ def file_to_ReaxFF_bond_table(
         Whether to optimize space usage, by default False
     save : bool, optional
         Whether to save the table. Needed for `large_file`, by default False
-    save_path : Path | str, optional
+    save_path : Path , optional
         The path (including name and extension) to save the table to if `save` is True, by default ""
+    write_kwargs : dict[str, Any] | None, optional
+        Additional parameters for the `polars.write_` functions, by default None
     delete_file : bool, optional
         Whether to delete the original bond file, this could save space, by default False
 
@@ -388,7 +393,15 @@ def file_to_ReaxFF_bond_table(
     -------
     LazyFrame
         A table containing all the bond information
+
+    Raises
+    ------
+    ValueError
+        The save_path does not have a known extension
     """
+    if write_kwargs is None:
+        write_kwargs = {}
+
     if sort is None:
         sort = ["timestep", "id"]
     elif isinstance(sort, str):
@@ -414,6 +427,16 @@ def file_to_ReaxFF_bond_table(
             save_path,
         )
 
+        match save_path.suffix:
+            case ".csv":
+                table = pl.scan_csv(save_path)
+            case ".parquet":
+                table = pl.scan_csv(save_path.with_suffix(".csv"))
+                table.sink_parquet(save_path, **write_kwargs)
+                table = pl.scan_parquet(save_path)
+            case _:
+                raise ValueError(save_path.suffix)
+
     else:
         data: list[str] = _file_to_data(file_path)
 
@@ -423,9 +446,17 @@ def file_to_ReaxFF_bond_table(
         table_d = table_d.sort(sort)
 
         if save:
-            table_d.write_csv(save_path)
-
-        table = table_d.lazy()
+            match save_path.suffix:
+                case ".csv":
+                    table_d.write_csv(save_path, **write_kwargs)
+                    table = pl.scan_csv(save_path)
+                case ".parquet":
+                    table_d.write_parquet(save_path, **write_kwargs)
+                    table = pl.scan_parquet(save_path)
+                case _:
+                    raise ValueError(save_path.suffix)
+        else:
+            table = table_d.lazy()
 
     if delete_file:
         Path(file_path).unlink()

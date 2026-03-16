@@ -24,3 +24,4 @@ This script relies on [numpy](https://numpy.org/) and [polars](https://pola.rs/)
 
 ## TODO
 - [x] Support for varying number of particles
+- [ ] Save as .parquet (or other format) instead of .csv for performance; for in memory doable, for sequential maybe csv first then lazy stream to parquet?
