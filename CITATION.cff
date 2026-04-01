@@ -1,0 +1,25 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: lammps_reaxff_bonds_parser
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
+authors:
+  - given-names: Tim
+    affiliation: TU/e
+repository-code: >-
+  https://github.com/TimKruikemeijerTUe/lammps_reaxff_bonds_parser
+abstract: >-
+  Turns a LAMMPS ReaxFF bond file into a `polars` table and
+  optionally save it as CSV or parquet file
+keywords:
+  - csv
+  - parquet
+  - LAMMPS
+  - ReaxFF
+  - polars
+  - python
+license: MIT
