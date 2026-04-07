@@ -15,6 +15,10 @@ if tqdm_installed:
     from tqdm import tqdm
 
 
+class ParsingError(Exception):
+    """Error in parsing the ReaxFF LAMMPS bonds file."""
+
+
 def _step_data_to_table(
     data_step: list[str],
     nr_part: int,
@@ -44,6 +48,11 @@ def _step_data_to_table(
     -------
     DataFrame
         The step table
+
+    Raises
+    ------
+    ParsingError
+        Line parsing failed
     """
     # Sentinel value to replace empty values later. Largest signed 32 bit int
     sentinel = -2147483648
@@ -60,27 +69,31 @@ def _step_data_to_table(
     qs = np.full(nr_part, sentinel, dtype=np.float64)
 
     # Iterate over the lines
-    for i in range(nr_part):
-        line: str = data_step[i]
-        t: list[str] = line.split()
+    try:
+        for i in range(nr_part):
+            line: str = data_step[i]
+            t: list[str] = line.split()
 
-        ids[i] = int(t[0])
-        types[i] = int(t[1])
+            ids[i] = int(t[0])
+            types[i] = int(t[1])
 
-        nb: int = int(t[2])
-        nbs[i] = nb
+            nb: int = int(t[2])
+            nbs[i] = nb
 
-        for k in range(nb):
-            idns[i, k] = int(t[3 + k])
+            for k in range(nb):
+                idns[i, k] = int(t[3 + k])
 
-        mols[i] = int(t[3 + nb])
+            mols[i] = int(t[3 + nb])
 
-        for k in range(nb):
-            bos[i, k] = float(t[4 + nb + k])
+            for k in range(nb):
+                bos[i, k] = float(t[4 + nb + k])
 
-        abos[i] = float(t[4 + 2 * nb])
-        nlps[i] = int(float(t[5 + 2 * nb]))
-        qs[i] = float(t[6 + 2 * nb])
+            abos[i] = float(t[4 + 2 * nb])
+            nlps[i] = int(float(t[5 + 2 * nb]))
+            qs[i] = float(t[6 + 2 * nb])
+    except ValueError as e:
+        msg = f"Unable to parse '{line}'"
+        raise ParsingError(msg) from e
 
     # Dynamically create dicts
     idns_dict = {head: idns[:, id] for id, head in enumerate(id_heads)}
@@ -392,12 +405,14 @@ def file_to_ReaxFF_bond_table(
     Returns
     -------
     LazyFrame
-        A table containing all the bond information
+        A table containing all the bond information.
 
     Raises
     ------
     ValueError
-        The save_path does not have a known extension
+        The save_path does not have a known extension.
+    ParsingError
+        A line could not be parsed.
     """
     if write_kwargs is None:
         write_kwargs = {}
@@ -417,7 +432,7 @@ def file_to_ReaxFF_bond_table(
 
         del comments  # For space
 
-        table: LazyFrame = _create_table_seq(
+        _create_table_seq(
             file_path,
             timesteps,
             nr_parts,
