@@ -1,6 +1,8 @@
 # lammps_reaxff_bonds_parser
 Turns a LAMMPS ReaxFF bond file into a `polars` table and optionally save it as CSV or parquet file. Can be used with large files.
 
+Saving to parquet can easily decrease the file size by a factor 6.
+
 ## Usage
 ```python
 from lammps_reaxff_bonds_parser import file_to_ReaxFF_bond_table

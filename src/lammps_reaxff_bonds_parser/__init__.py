@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-import sys
 from importlib.util import find_spec
 from itertools import islice, repeat
 from pathlib import Path
@@ -68,7 +67,7 @@ def _step_data_to_table(
     nlps = np.full(nr_part, sentinel, dtype=np.int32)
     qs = np.full(nr_part, sentinel, dtype=np.float64)
 
-    # Iterate over the lines
+    # Iterate over the lines; TODO Probably suboptimal
     try:
         for i in range(nr_part):
             line: str = data_step[i]
@@ -181,12 +180,12 @@ def _parse_comments(comments: list[str]) -> tuple[list[int], int | list[int], in
         }:
             continue
         else:
-            print("ERROR: Unrecognized comment string")
-            sys.exit()
+            msg = f"Unrecognized comment string: '{com}'"
+            raise ParsingError(msg)
 
     if len(timesteps) != len(nr_parts) or len(nr_parts) != len(max_bs):
-        print("ERROR: Comments parsed unequally")
-        sys.exit()
+        msg_0 = "Nr of timesteps, particles, and max bonds do not match"
+        raise ParsingError(msg_0)
 
     # Parse number of particles
     if len(np.unique(nr_parts)) == 1:
@@ -427,8 +426,8 @@ def file_to_ReaxFF_bond_table(
 
     if large_file:
         if not save:
-            print("ERROR: For large files saving is needed for useful behaviour")
-            sys.exit()
+            msg = "large_file=True requires save=True"
+            raise ValueError(msg)
 
         del comments  # For space
 
